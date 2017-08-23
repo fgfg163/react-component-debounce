@@ -1,0 +1,47 @@
+{
+  "name": "react-component-debounce",
+  "version": "0.0.1",
+  "description": "An react component add debounce to onChange handler.",
+  "main": "index.js",
+  "scripts": {
+    "publish": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fgfg163/react-debounce.git"
+  },
+  "keywords": [
+    "react",
+    "debounce"
+  ],
+  "author": "fgfg163",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/fgfg163/react-debounce/issues"
+  },
+  "homepage": "https://github.com/fgfg163/react-debounce#readme",
+  "dependencies": {
+    "antd": "^2.12.7",
+    "react": "^15.6.1",
+    "react-dom": "^15.6.1",
+    "should-update": "^2.0.0"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-eslint": "^7.2.3",
+    "babel-loader": "^7.1.2",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-preset-env": "^1.6.0",
+    "babel-preset-react": "^6.24.1",
+    "babel-preset-react-hmre": "^1.1.1",
+    "babel-register": "^6.26.0",
+    "eslint": "^4.5.0",
+    "eslint-config-airbnb": "^15.1.0",
+    "eslint-loader": "^1.9.0",
+    "eslint-plugin-import": "^2.7.0",
+    "eslint-plugin-jsx-a11y": "^6.0.2",
+    "eslint-plugin-react": "^7.3.0",
+    "extract-text-webpack-plugin": "^3.0.0",
+    "gulp": "^3.9.1"
+  }
+}

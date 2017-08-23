@@ -1,0 +1,22 @@
+{
+  "extends": "airbnb",
+  "parser": "babel-eslint",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "experimentalObjectRestSpread": true
+    }
+  },
+  "globals": {
+    "window": true
+  },
+  "rules": {
+    "import/no-unresolved": 0,
+    "jsx-a11y/href-no-hash": 0,
+    "no-confusing-arrow": [
+      "error",
+      {
+        "allowParens": true
+      }
+    ]
+  }
+}

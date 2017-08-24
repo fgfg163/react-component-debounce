@@ -4,7 +4,6 @@
   "description": "An react component add debounce to onChange handler.",
   "main": "index.js",
   "scripts": {
-    "start": "webpack-dev-server --config ./dev/webpack.config.js",
     "publish": "del /Q /s .\\dist & rm -rf ./dist & gulp"
   },
   "repository": {
@@ -51,10 +50,6 @@
     "gulp-rename": "^1.2.2",
     "gulp-sourcemaps": "^2.6.1",
     "gulp-uglify": "^3.0.0",
-    "html-pages": "^1.7.3",
-    "html-webpack-plugin": "^2.30.1",
-    "option": "^0.2.4",
-    "webpack": "^3.5.5",
-    "webpack-dev-server": "^2.7.1"
+    "pump": "^1.0.2"
   }
 }

@@ -4,8 +4,8 @@
   "description": "An react component add debounce to onChange handler.",
   "main": "index.js",
   "scripts": {
-    "start": "webpack-dev-server --config ./dev/webpack.config.js",
-    "publish": "del /Q /s .\\dist & rm -rf ./dist & gulp"
+    "start": "html-pages -p 8080",
+    "publish": "del /Q /s .\\dist & rm -rf ./dist & gulp publish"
   },
   "repository": {
     "type": "git",

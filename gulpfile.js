@@ -65,6 +65,6 @@ gulp.task('copy', function (cb) {
     .pipe(gulp.dest('dist'));
 });
 
-gulp.task('default', ['copy', 'es', 'lib', 'package', 'package-min'], function () {
-
+// script: publish
+gulp.task('publish', ['copy', 'es', 'lib', 'package', 'package-min'], function () {
 });

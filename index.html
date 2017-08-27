@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="cache-control" content="no-cache">
+  <title>Title</title>
+  <link href="/node_modules/antd/dist/antd.min.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+  <script src="/dev/lib/babel.min.js"></script>
+  <script src="/dev/lib/babel-await-require-plugin.js"></script>
+  <script src="/dev/lib/await-require.js"></script>
+  <script>
+    awaitRequire({
+      entry: '/dev/index.jsx',
+      alias: {
+        antd: '~/antd/dist/antd.js',
+        react: '~/react/dist/react.js',
+        'react-dom': '~/react-dom/dist/react-dom.js',
+      },
+      modules: ['node_modules'],
+      extensions: ['.js', '.jsx'],
+    })
+  </script>
+</body>
+</html>

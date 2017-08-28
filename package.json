@@ -23,6 +23,7 @@
   "homepage": "https://github.com/fgfg163/react-debounce#readme",
   "dependencies": {
     "antd": "^2.12.8",
+    "prop-types": "^15.5.10",
     "react": "^15.6.1",
     "react-dom": "^15.6.1",
     "should-update": "^2.0.0"

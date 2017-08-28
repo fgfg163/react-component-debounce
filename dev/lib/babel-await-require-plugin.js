@@ -9,7 +9,10 @@
             if (global && global.awaitRequire && global.awaitRequire.preloadFactory) {
               const theFirstArg = (path.node.arguments || [])[0] || {};
               if (theFirstArg.type === 'StringLiteral') {
-                global.awaitRequire.preloadFactory(root.file.opts.filename)(theFirstArg.value);
+                try {
+                  global.awaitRequire.preloadFactory(root.file.opts.filename, true)(theFirstArg.value);
+                } catch (err) {
+                }
               }
             }
 

@@ -1,8 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { shouldUpdate } from 'should-update';
 import { Checkbox, Col, Collapse, Row, Switch } from 'antd';
-import reactFormFieldDebounce from '../../utils/react-form-field-debounce';
+import shouldUpdate from './should-update';
+import reactFormFieldDebounce from '../src/index';
+
+console.log(PropTypes);
 
 const CheckboxA = reactFormFieldDebounce({
   valuePropName: 'checked',

@@ -6,4 +6,3 @@ build*.zip
 .vscode
 .idea
 .svn
-package-lock.json

@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import FormPage from './form-page.jsx';
+import FormPage from './form-page';
 
 const App = () => (
   <FormPage />

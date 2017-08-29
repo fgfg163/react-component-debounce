@@ -5,8 +5,8 @@
   const moduleList = (() => {
     const idMapToModule = {};
     return {
-      show() {
-        console.log(JSON.parse(JSON.stringify(idMapToModule)));
+      get() {
+        return JSON.parse(JSON.stringify(idMapToModule));
       },
       getById(id) {
         if (idMapToModule[id]) {
@@ -133,30 +133,36 @@
         xhr.send(formData);
       })
     ),
-    getResWithExtensions: async (url, ...param) => {
-      // 如果url不是点或斜杠开头的，说明这是一个node_modules中的文件
-      if (/^[^/^.]/.test(url) && theOptions.alias[url]) {
-        if (typeof (theOptions.alias[url]) === 'string') {
-          if (/^~\//.test(theOptions.alias[url])) {
-            const aliasUrl = theOptions.alias[url].replace(/^~\//, '');
-            try {
-              for (const val of theOptions.modules) {
-                const newUrl = path.join('/', val, aliasUrl);
-                return await theOptions.getRes(newUrl, ...param);
-              }
-            } catch (err) {
-            }
-          } else {
-            try {
-              const newUrl = path.join('/', theOptions.alias[url]);
-              return await theOptions.getRes(newUrl, ...param);
-            } catch (err) {
-            }
-          }
+    checkModuleExistsWithExtensions(url) {
+      let resultUrlList = [{
+        url,
+        isModules: false,
+      }];
+      if (/^[^/^.]/.test(url)) {
+        if (theOptions.alias[url]) {
+          resultUrlList = [{
+            url: theOptions.alias[url],
+            isModules: false,
+          }];
         }
-        throw new Error(`module ${url} not found`);
       }
-      // 如果url是点或斜杠开头的，说明这是一个普通文件
+      const resultUrlList2 = [];
+      resultUrlList.forEach((urlItem) => {
+        if (/^[^/^.]/.test(urlItem.url)) {
+          theOptions.modules.forEach((val) => {
+            resultUrlList2.push({
+              url: path.join('/', val, urlItem.url),
+              isModules: true,
+            });
+          });
+        } else {
+          resultUrlList2.push({
+            url,
+            isModules: false,
+          });
+        }
+      });
+
       let theExtensions = theOptions.extensions;
       // 如果url没有后缀名，extensions 长度大于1，extensions 第一位是空格，则将空格移到第二位，优化查询优先级
       if (!/\.[^.^/]*$/.test(url) && theExtensions.length > 1 && theExtensions[0] === '') {
@@ -164,11 +170,25 @@
         theExtensions.push(theExtensions[0]);
         theExtensions.shift();
       }
-      for (const val of theExtensions) {
-        // 按顺序遍历相应后缀
+
+      const resultUrlList3 = [];
+      resultUrlList2.forEach((urlItem) => {
+        theExtensions.forEach((val) => {
+          resultUrlList3.push({
+            url: `${urlItem.url}${val}`,
+            isModules: urlItem.isModules,
+          });
+        });
+      });
+      return resultUrlList3;
+    },
+    getResWithExtensions: async (url, ...param) => {
+      const urlList = theOptions.checkModuleExistsWithExtensions(url);
+      for (const urlItem of urlList) {
         try {
-          return await theOptions.getRes(`${url}${val}`, ...param);
+          return await theOptions.getRes(urlItem.url, ...param);
         } catch (err) {
+          console.error(err);
         }
       }
       throw new Error(`module ${url} not found`);
@@ -188,61 +208,85 @@
   };
 
   const requireFactory = (baseId, isPreload) => ((relativeId = '') => {
-    let id = path.join(path.dirname(baseId), relativeId);
-    let noTrance = false;
-    if (/^[^/^.]/.test(relativeId) && theOptions.alias[relativeId]) {
-      if (typeof (theOptions.alias[relativeId]) === 'string') {
-        id = relativeId;
-        noTrance = true;
-      } else {
-        return theOptions.alias[relativeId];
-      }
-    }
+    const id = path.join(path.dirname(baseId), relativeId);
+
     if (moduleList.getById(id)) {
       const theModule = moduleList.getById(id);
-      if (theModule.isFirstRequired) {
-        theModule.isFirstRequired = false;
+      if (theModule.isFirstRun) {
+        console.log(id);
+        console.log(theModule);
+        console.log(moduleList.get());
+        theModule.isFirstRun = false;
+        theModule.firstRunStartHandle();
         return theModule.statePromise;
       } else if (theModule.loadingState === 'pending') {
-        theModule.isFirstRequired = false;
         return theModule.loadingPromise;
       }
-      theModule.isFirstRequired = false;
       return theModule.exports;
     }
 
     const moduleHandle = {
       id,
-      path: id,
       state: 'pending', // 模块状态（包括网络请求、编译代码、执行完毕）
       runFinished: () => {
       },
       statePromise: undefined,
+      firstRunStartHandle: undefined,
       loadingState: 'pending', // 载入状态（包括网络请求和编译代码）
       loadingPromise: undefined,
-      isFirstRequired: !!isPreload,
-      exports: {},
+      isFirstRun: true,
+      body: null,
+      exports: undefined,
     };
 
-    const loadingPromise = (async (id) => {
+    const firstRunPromise = new Promise((resolve) => {
+      moduleHandle.firstRunStartHandle = resolve;
+    });
+    if (!isPreload) {
+      moduleHandle.firstRunStartHandle();
+    }
+
+    const loadingPromise = (async () => {
       const theScript = document.createElement('script');
-      const [res, xhr] = await theOptions.getResWithExtensions(id);
-      moduleHandle.path = path.resolve('/', xhr.responseURL.replace(/[^/]*:\/\/[^/]*\//, ''));
-      if (id !== moduleHandle.path && moduleList.getById(moduleHandle.path)) {
-        moduleList.setModule(id, moduleList.getById(moduleHandle.path));
-        moduleHandle.runFinished(moduleList.getById(moduleHandle.path).exports);
-        return moduleList.getById(moduleHandle.path).exports;
+      let res;
+      let xhr;
+      let theSuccessUrl;
+      const urlList = theOptions.checkModuleExistsWithExtensions(id);
+      for (const urlItem of urlList) {
+        try {
+          [res, xhr] = await theOptions.getRes(urlItem.url);
+          theSuccessUrl = urlItem;
+          break;
+        } catch (err) {
+          console.error(err);
+        }
       }
-      moduleList.setModule(moduleHandle.path, moduleHandle);
+      if (!xhr) {
+        throw new Error(`module ${id} not found`);
+      }
+      if (id !== theSuccessUrl.url && moduleList.getById(theSuccessUrl.url)) {
+        const urlModule = moduleList.getById(theSuccessUrl.url);
+        moduleList.setModule(id, urlModule);
+        if (urlModule.isFirstRun) {
+          urlModule.firstRunStartHandle();
+          return urlModule.statePromise;
+        }
+        return urlModule.loadingPromise;
+      }
+      if (!moduleList.getById(theSuccessUrl.url)) {
+        const thisModule = moduleList.getById(id);
+        thisModule.id = theSuccessUrl.url;
+        moduleList.setModule(theSuccessUrl.url, thisModule);
+      }
       let theCacheFile = '';
       let theCacheTime = 0;
       if (global.localStorage) {
-        theCacheFile = global.localStorage.getItem(`await-require/cachefile/${moduleHandle.path}`);
-        theCacheTime = global.localStorage.getItem(`await-require/cachetime/${moduleHandle.path}`);
+        theCacheFile = global.localStorage.getItem(`await-require/cachefile/${theSuccessUrl.url}`);
+        theCacheTime = global.localStorage.getItem(`await-require/cachetime/${theSuccessUrl.url}`);
       }
       const serverLastModified = xhr.getResponseHeader('Last-Modified');
       if (serverLastModified && theCacheTime !== String(new Date(serverLastModified).getTime())) {
-        if (!noTrance) {
+        if (!theSuccessUrl.isModules) {
           const babelObj = transCode({
             filename: id,
             code: res,
@@ -255,35 +299,45 @@
           let newRes = res;
           if (sourceRes && sourceRes[0]) {
             const theMapPath = sourceRes[0].replace('//# sourceMappingURL=', '');
-            const finalPath = (path.resolve('/', moduleHandle.path, theMapPath));
+            const finalPath = (path.resolve('/', theSuccessUrl.url, theMapPath));
             newRes = res.replace(/\/\/# sourceMappingURL=[^\n]*/, `//# sourceMappingURL=${finalPath}`);
           }
           theCacheFile = `\n;awaitRequire.define(${JSON.stringify(id)}, async function (require, module, exports, id) {\n${newRes}\n});\n`;
         }
-        if (global.localStorage) {
-          global.localStorage.setItem(`await-require/cachefile/${moduleHandle.path}`, theCacheFile);
-          global.localStorage.setItem(`await-require/cachetime/${moduleHandle.path}`, String(new Date(serverLastModified).getTime()));
-        }
+        // if (global.localStorage) {
+        //   global.localStorage.setItem(`await-require/cachefile/${theSuccessUrl.url}`, theCacheFile);
+        //   global.localStorage.setItem(`await-require/cachetime/${theSuccessUrl.url}`, String(new Date(serverLastModified).getTime()));
+        // }
       }
       theScript.innerHTML = theCacheFile;
       domBody.appendChild(theScript);
       return moduleHandle.exports;
-    })(id);
+    })();
+    moduleHandle.loadingPromise = loadingPromise;
 
     loadingPromise.then(() => {
       moduleHandle.loadingState = 'resolve';
     }).catch(() => {
       moduleHandle.loadingState = 'reject';
     });
-
-    moduleHandle.loadingPromise = loadingPromise;
-
-    const statePromise = Promise.all([
-      new Promise((resolve) => {
-        moduleHandle.runFinished = resolve;
-      }),
-      loadingPromise,
-    ]).then(([res]) => res);
+    const statePromise = (async () => {
+      await loadingPromise;
+      await firstRunPromise;
+      const require = requireFactory(id);
+      const module = moduleList.getById(id);
+      module.exports = {};
+      console.log('run ' + id);
+      const moduleBodyHandle = module.body(require, module, module.exports, id, path);
+      if (typeof (moduleBodyHandle) !== 'object' || typeof (moduleBodyHandle.then) !== 'function') {
+        throw TypeError('Module must return a thenable object');
+      }
+      moduleBodyHandle.then(() => {
+        console.log('........');
+        console.log(JSON.parse(JSON.stringify(module)));
+      });
+      return moduleBodyHandle.then(() => module.exports);
+    })();
+    moduleHandle.statePromise = statePromise;
 
     statePromise.then(() => {
       moduleHandle.state = 'resolve';
@@ -291,10 +345,7 @@
       moduleHandle.state = 'reject';
     });
 
-    moduleHandle.statePromise = statePromise;
-
     moduleList.setModule(id, moduleHandle);
-    moduleHandle.isFirstRequired = false;
     return statePromise;
   });
 
@@ -305,15 +356,9 @@
     if (typeof (mod) !== 'function') {
       throw TypeError('Module must be a async function or return a promise');
     }
-    const module = moduleList.getById(id);
-    const require = requireFactory(id);
-    const moduleHandle = mod(require, module, module.exports, id);
-    if (typeof (moduleHandle) !== 'object' || typeof (moduleHandle.then) !== 'function') {
-      throw TypeError('Module must return a promise');
-    }
-    await moduleHandle;
 
-    module.runFinished(module.exports);
+    const module = moduleList.getById(id);
+    module.body = mod;
   };
 
   awaitRequire.init = (options = {}) => {

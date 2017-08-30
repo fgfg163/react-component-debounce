@@ -83,8 +83,10 @@
 
   const theOptions = {
     alias: {},
-    extensions: ['.js'],
+    extensions: ['', '/index.js', '.js'],
     modules: ['node_modules'],
+    cacheTimeout: 86400 * 1000,
+    noCache: true,
     getRes: (url, options = {}) => (
       new Promise((resolve, reject) => {
         let theUrl = url;
@@ -164,7 +166,7 @@
       });
 
       let theExtensions = theOptions.extensions;
-      // 如果url没有后缀名，extensions 长度大于1，extensions 第一位是空格，则将空格移到第二位，优化查询优先级
+      // 如果url没有后缀名，extensions 长度大于1，extensions 第一位是空格，则将空格移到最后一位，优化查询优先级
       if (!/\.[^.^/]*$/.test(url) && theExtensions.length > 1 && theExtensions[0] === '') {
         theExtensions = [...theExtensions];
         theExtensions.push(theExtensions[0]);
@@ -182,171 +184,231 @@
       });
       return resultUrlList3;
     },
-    getResWithExtensions: async (url, ...param) => {
-      const urlList = theOptions.checkModuleExistsWithExtensions(url);
-      for (const urlItem of urlList) {
-        try {
-          return await theOptions.getRes(urlItem.url, ...param);
-        } catch (err) {
-          console.error(err);
-        }
-      }
-      throw new Error(`module ${url} not found`);
-    },
   };
 
   const domBody = document.getElementsByTagName('body')[0];
+  const domHead = document.getElementsByTagName('head')[0];
 
   const transCode = ({ filename, code }) => {
     const babelObj = global.Babel.transform(code, {
       presets: ['stage-2', 'react'],
       plugins: ['transform-decorators-legacy', 'transform-es2015-modules-commonjs', 'await-require-plugin'],
-      sourceMaps: 'inline',
+      sourceMaps: true,
       filename,
     });
     return babelObj;
   };
 
   const requireFactory = (baseId, isPreload) => ((relativeId = '') => {
-    const id = path.join(path.dirname(baseId), relativeId);
+    let theId = path.resolve(path.dirname(baseId), relativeId);
+    if (/^[^/^.]/.test(relativeId)) {
+      theId = relativeId;
+      if (theOptions.alias[relativeId]) {
+        theId = theOptions.alias[relativeId];
+      }
+    }
+    const id = theId;
 
+    // 如果模块已经被载入并开始执行，则直接返回执行结果
     if (moduleList.getById(id)) {
       const theModule = moduleList.getById(id);
-      if (theModule.isFirstRun) {
-        console.log(id);
-        console.log(theModule);
-        console.log(moduleList.get());
-        theModule.isFirstRun = false;
-        theModule.firstRunStartHandle();
-        return theModule.statePromise;
-      } else if (theModule.loadingState === 'pending') {
-        return theModule.loadingPromise;
+      if (!theModule.isFirstRequire) {
+        return theModule.exports;
       }
-      return theModule.exports;
     }
 
-    const moduleHandle = {
-      id,
-      state: 'pending', // 模块状态（包括网络请求、编译代码、执行完毕）
-      runFinished: () => {
-      },
-      statePromise: undefined,
-      firstRunStartHandle: undefined,
-      loadingState: 'pending', // 载入状态（包括网络请求和编译代码）
-      loadingPromise: undefined,
-      isFirstRun: true,
-      body: null,
-      exports: undefined,
-    };
-
-    const firstRunPromise = new Promise((resolve) => {
-      moduleHandle.firstRunStartHandle = resolve;
-    });
-    if (!isPreload) {
-      moduleHandle.firstRunStartHandle();
-    }
-
-    const loadingPromise = (async () => {
-      const theScript = document.createElement('script');
-      let res;
-      let xhr;
-      let theSuccessUrl;
-      const urlList = theOptions.checkModuleExistsWithExtensions(id);
-      for (const urlItem of urlList) {
-        try {
-          [res, xhr] = await theOptions.getRes(urlItem.url);
-          theSuccessUrl = urlItem;
-          break;
-        } catch (err) {
-          console.error(err);
-        }
-      }
-      if (!xhr) {
-        throw new Error(`module ${id} not found`);
-      }
-      if (id !== theSuccessUrl.url && moduleList.getById(theSuccessUrl.url)) {
-        const urlModule = moduleList.getById(theSuccessUrl.url);
-        moduleList.setModule(id, urlModule);
-        if (urlModule.isFirstRun) {
-          urlModule.firstRunStartHandle();
-          return urlModule.statePromise;
-        }
-        return urlModule.loadingPromise;
-      }
-      if (!moduleList.getById(theSuccessUrl.url)) {
-        const thisModule = moduleList.getById(id);
-        thisModule.id = theSuccessUrl.url;
-        moduleList.setModule(theSuccessUrl.url, thisModule);
-      }
-      let theCacheFile = '';
-      let theCacheTime = 0;
-      if (global.localStorage) {
-        theCacheFile = global.localStorage.getItem(`await-require/cachefile/${theSuccessUrl.url}`);
-        theCacheTime = global.localStorage.getItem(`await-require/cachetime/${theSuccessUrl.url}`);
-      }
-      const serverLastModified = xhr.getResponseHeader('Last-Modified');
-      if (serverLastModified && theCacheTime !== String(new Date(serverLastModified).getTime())) {
-        if (!theSuccessUrl.isModules) {
-          const babelObj = transCode({
-            filename: id,
-            code: res,
-          });
-
-          const theCode = babelObj.code;
-          theCacheFile = `\n;awaitRequire.define(${JSON.stringify(id)}, async function (require, module, exports, id) {\n${theCode}\n});\n`;
-        } else {
-          const sourceRes = res.match(/\/\/# sourceMappingURL=[^\n]*/);
-          let newRes = res;
-          if (sourceRes && sourceRes[0]) {
-            const theMapPath = sourceRes[0].replace('//# sourceMappingURL=', '');
-            const finalPath = (path.resolve('/', theSuccessUrl.url, theMapPath));
-            newRes = res.replace(/\/\/# sourceMappingURL=[^\n]*/, `//# sourceMappingURL=${finalPath}`);
-          }
-          theCacheFile = `\n;awaitRequire.define(${JSON.stringify(id)}, async function (require, module, exports, id) {\n${newRes}\n});\n`;
-        }
-        // if (global.localStorage) {
-        //   global.localStorage.setItem(`await-require/cachefile/${theSuccessUrl.url}`, theCacheFile);
-        //   global.localStorage.setItem(`await-require/cachetime/${theSuccessUrl.url}`, String(new Date(serverLastModified).getTime()));
-        // }
-      }
-      theScript.innerHTML = theCacheFile;
-      domBody.appendChild(theScript);
-      return moduleHandle.exports;
-    })();
-    moduleHandle.loadingPromise = loadingPromise;
-
-    loadingPromise.then(() => {
-      moduleHandle.loadingState = 'resolve';
-    }).catch(() => {
-      moduleHandle.loadingState = 'reject';
-    });
-    const statePromise = (async () => {
-      await loadingPromise;
-      await firstRunPromise;
-      const require = requireFactory(id);
-      const module = moduleList.getById(id);
-      module.exports = {};
-      console.log('run ' + id);
-      const moduleBodyHandle = module.body(require, module, module.exports, id, path);
-      if (typeof (moduleBodyHandle) !== 'object' || typeof (moduleBodyHandle.then) !== 'function') {
-        throw TypeError('Module must return a thenable object');
-      }
-      moduleBodyHandle.then(() => {
-        console.log('........');
-        console.log(JSON.parse(JSON.stringify(module)));
+    if (!moduleList.getById(id)) {
+      moduleList.setModule(id, {
+        id,
+        state: '', // 模块状态，state=='':尚未开始，state=='pending':开始加载并执行代码（包括网络请求、编译代码、执行完毕）
+        statePromise: null,
+        loadingState: '', // 载入状态 loadingState=='':尚未开始，loadingState=='pending':开始加载（包括网络请求和编译代码）
+        isFirstRequire: true,
+        body: null,
+        type: 'script', // 载入方式，script 表示内容将当作js从script标签注入。style 表示内容当作css从style插入
+        exports: undefined,
       });
-      return moduleBodyHandle.then(() => module.exports);
-    })();
-    moduleHandle.statePromise = statePromise;
+    }
 
-    statePromise.then(() => {
-      moduleHandle.state = 'resolve';
-    }).catch(() => {
-      moduleHandle.state = 'reject';
-    });
+    if (!moduleList.getById(id).statePromise) {
+      moduleList.getById(id).loadingState = 'pending';
+      moduleList.getById(id).statePromise = (async () => {
+        try {
+          let res;
+          let xhr;
+          let theSuccessUrl;
+          const urlList = theOptions.checkModuleExistsWithExtensions(id);
+          for (const urlItem of urlList) {
+            try {
+              [res, xhr] = await theOptions
+                .getRes(urlItem.url, { noCache: theOptions.noCache });
+              theSuccessUrl = urlItem;
+              break;
+            } catch (err) {
+              console.error(err);
+            }
+          }
 
-    moduleList.setModule(id, moduleHandle);
-    return statePromise;
+          if (!xhr) {
+            throw new TypeError(`module ${id} not found`);
+          }
+
+          if (id !== theSuccessUrl.url && moduleList.getById(theSuccessUrl.url)) {
+            const urlModule = moduleList.getById(theSuccessUrl.url);
+            moduleList.setModule(id, urlModule);
+            return urlModule.exports;
+          }
+          if (!moduleList.getById(theSuccessUrl.url)) {
+            const thisModule = moduleList.getById(id);
+            thisModule.id = theSuccessUrl.url;
+            moduleList.setModule(theSuccessUrl.url, thisModule);
+          }
+
+          if (moduleList.getById(id).id.match(/\.jsx?$/)) {
+            moduleList.getById(id).type = 'script';
+          } else if (moduleList.getById(id).id.match(/\.css$/)) {
+            moduleList.getById(id).type = 'style';
+          }
+
+          let theCacheFile = '';
+          let theCacheTime = 0;
+          let theExpires = 0;
+          if (global.localStorage && !theOptions.noCache) {
+            theCacheFile = global.localStorage.getItem(`await-require/cachefile/${theSuccessUrl.url}`);
+            theCacheTime = global.localStorage.getItem(`await-require/cachetime/${theSuccessUrl.url}`);
+            theExpires = global.localStorage.getItem(`await-require/expires/${theSuccessUrl.url}`);
+          }
+          const serverLastModified = xhr.getResponseHeader('Last-Modified');
+          if (!serverLastModified || theCacheTime !== String(new Date(serverLastModified).getTime()) || theExpires < Date.now()) {
+            if (moduleList.getById(id).type === 'script') {
+              if (!theSuccessUrl.isModules) {
+                const babelObj = transCode({
+                  filename: moduleList.getById(id).id,
+                  code: res,
+                });
+
+                const theCode = babelObj.code;
+                const theMap = babelObj.map;
+                theMap.mappings = `;${theMap.mappings}`;
+                theCacheFile = `;awaitRequire.define(${JSON.stringify(moduleList.getById(id).id)}, async function (require, module, exports, id) {\n${theCode}\n});\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${window.Base64.encode(JSON.stringify(theMap))}\n`;
+              } else {
+                const sourceRes = res.match(/\/\/# sourceMappingURL=[^\n]*/);
+                let newRes = res;
+                if (sourceRes && sourceRes[0]) {
+                  if (!sourceRes[0].match('data:application/json;charset=utf-8;base64')) {
+                    const theMapPath = sourceRes[0].replace('//# sourceMappingURL=', '');
+                    const finalPath = (path.resolve('/', path.dirname(theSuccessUrl.url), theMapPath));
+                    let mapRes;
+                    try {
+                      [mapRes] = await theOptions.getRes(finalPath);
+                      const theMap = JSON.parse(mapRes);
+                      theMap.mappings = `;${theMap.mappings}`;
+                      newRes = res.replace(/\/\/# sourceMappingURL=[^\n]*/, `//# sourceMappingURL=data:application/json;charset=utf-8;base64${window.Base64.encode(JSON.stringify(theMap))}`);
+                    } catch (err) {
+                      newRes = res.replace(/\/\/# sourceMappingURL=[^\n]*/, `//# sourceMappingURL=${finalPath}`);
+                    }
+                  } else {
+                    try {
+                      const theMap = JSON.parse(window.Base64.decode(sourceRes[0].replace('//# sourceMappingURL=', '')));
+                      theMap.mappings = `;${theMap.mappings}`;
+                      newRes = res.replace(/\/\/# sourceMappingURL=[^\n]*/, `//# sourceMappingURL=data:application/json;charset=utf-8;base64${window.Base64.encode(JSON.stringify(theMap))}`);
+                    } catch (err) {
+                    }
+                  }
+                }
+                theCacheFile = `;awaitRequire.define(${JSON.stringify(moduleList.getById(id).id)}, async function (require, module, exports, id, process) {\n${newRes}\n});\n`;
+              }
+            } else if (moduleList.getById(id).type === 'style') {
+              theCacheFile = res;
+            }
+            if (global.localStorage && !theOptions.noCache) {
+              global.localStorage.setItem(`await-require/cachefile/${theSuccessUrl.url}`, theCacheFile);
+              global.localStorage.setItem(`await-require/cachetime/${theSuccessUrl.url}`, String(new Date(serverLastModified).getTime()));
+              global.localStorage.setItem(`await-require/expires/${theSuccessUrl.url}`, Date.now() + theOptions.cacheTimeout);
+            }
+          }
+          if (moduleList.getById(id).id.match(/\.jsx?$/)) {
+            const theScript = document.createElement('script');
+            theScript.innerHTML = theCacheFile;
+            if (moduleList.getById(id).id === '/node_modules/antd/es/index.js') {
+              console.log(theCacheFile);
+              console.log(theScript);
+            }
+            domBody.appendChild(theScript);
+            if (moduleList.getById(id).id === '/node_modules/antd/es/index.js') {
+              console.log(123123123)
+            }
+          } else if (moduleList.getById(id).id.match(/\.css$/)) {
+            moduleList.getById(id).body = res;
+          }
+        } catch (err) {
+          moduleList.getById(id).state = 'reject';
+          throw err;
+        }
+
+        return moduleList.getById(id).exports;
+      })();
+    }
+
+    if (!isPreload && moduleList.getById(id).isFirstRequire) {
+      const oldStatePromise = moduleList.getById(id).statePromise;
+      moduleList.getById(id).statePromise = (async () => {
+        await oldStatePromise;
+        if (moduleList.getById(id).type === 'style') {
+          const theStyle = document.createElement('style');
+          theStyle.setAttribute('type', 'text/css');
+          theStyle.setAttribute('data-id', moduleList.getById(id).id);
+          theStyle.setAttribute('data-parent-id', moduleList.getById(baseId).id);
+          theStyle.innerHTML = moduleList.getById(id).body;
+          const brother = (Array.from(global.document.querySelectorAll('head style') || [])).filter(item => item.getAttribute('data-id'));
+          let beforeBrotherIndex = -1;
+          let afterBrother = brother[0];
+          brother.forEach((item, index) => {
+            if (item.getAttribute('data-parent-id') === moduleList.getById(baseId).id) {
+              beforeBrotherIndex = index;
+            }
+          });
+          if (beforeBrotherIndex > -1) {
+            afterBrother = brother[beforeBrotherIndex + 1] || afterBrother;
+          }
+          if (afterBrother) {
+            domHead.insertBefore(theStyle, afterBrother);
+          } else {
+            domHead.appendChild(theStyle);
+          }
+          return moduleList.getById(id).body;
+        }
+
+        if (!moduleList.getById(id).isFirstRequire) {
+          return moduleList.getById(id).exports;
+        }
+        moduleList.getById(id).isFirstRequire = false;
+        try {
+          const require = requireFactory(id);
+          const module = moduleList.getById(id);
+          module.exports = {};
+          const process = { env: { NODE_ENV: 'development' } };
+          const moduleBodyHandle = module.body(require, module, module.exports, id, process);
+          moduleBodyHandle.catch((err) => {
+            console.error(moduleList.getById(id).id);
+            console.error(moduleList.getById(id));
+            console.error(err);
+          });
+          if (typeof (moduleBodyHandle) !== 'object' || typeof (moduleBodyHandle.then) !== 'function') {
+            throw TypeError('Module must return a thenable object');
+          }
+
+          moduleList.getById(id).state = 'resolve';
+          return moduleBodyHandle.then(() => module.exports);
+        } catch (err) {
+          moduleList.getById(id).state = 'reject';
+          throw err;
+        }
+      })();
+      return moduleList.getById(id).statePromise;
+    }
+
+    return moduleList.getById(id).export;
   });
 
   awaitRequire.preloadFactory = requireFactory;
@@ -389,6 +451,12 @@
         theOptions.extensions = [options.extensions];
       } else if (Array.isArray(options.extensions)) {
         theOptions.extensions = [...new Set(['', ...options.extensions])];
+      }
+      if (typeof (options.cacheTimeout) === 'number' || isNaN(window.parseInt(options.cacheTimeout))) {
+        theOptions.cacheTimeout = window.parseInt(options.cacheTimeout);
+      }
+      if (typeof (options.noCache) !== 'undefined') {
+        theOptions.noCache = !!options.noCache;
       }
     }
 

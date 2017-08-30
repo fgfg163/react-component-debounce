@@ -4,8 +4,6 @@ import { Checkbox, Col, Collapse, Row, Switch } from 'antd';
 import shouldUpdate from './should-update';
 import reactFormFieldDebounce from '../src/index';
 
-console.log(PropTypes);
-
 const CheckboxA = reactFormFieldDebounce({
   valuePropName: 'checked',
   triggerMs: 250,

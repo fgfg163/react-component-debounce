@@ -4,7 +4,7 @@
   "description": "An react component add debounce to onChange handler.",
   "main": "index.js",
   "scripts": {
-    "start": "html-pages -p 8080",
+    "start": "html-pages -p 8080 -d",
     "publish": "del /Q /s .\\dist & rm -rf ./dist & gulp publish"
   },
   "repository": {
@@ -23,6 +23,7 @@
   "homepage": "https://github.com/fgfg163/react-debounce#readme",
   "dependencies": {
     "antd": "^2.12.8",
+    "js-base64": "^2.1.9",
     "prop-types": "^15.5.10",
     "react": "^15.6.1",
     "react-dom": "^15.6.1",
@@ -38,12 +39,6 @@
     "babel-preset-stage-2": "^6.24.1",
     "babel-register": "^6.26.0",
     "babel-standalone": "^6.26.0",
-    "eslint": "^4.5.0",
-    "eslint-config-airbnb": "^15.1.0",
-    "eslint-loader": "^1.9.0",
-    "eslint-plugin-import": "^2.7.0",
-    "eslint-plugin-jsx-a11y": "^5.1.1",
-    "eslint-plugin-react": "^7.3.0",
     "gulp": "^3.9.1",
     "gulp-babel": "^7.0.0",
     "gulp-concat": "^2.6.1",

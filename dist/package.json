@@ -1,10 +1,11 @@
 {
   "name": "react-component-debounce",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "An react component add debounce to onChange handler.",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
-    "publish": "del /Q /s .\\dist & rm -rf ./dist & gulp"
+    "start": "html-pages -p 8080 -d",
+    "build": "del /Q /s .\\dist & rm -rf ./dist & gulp publish"
   },
   "repository": {
     "type": "git",
@@ -20,29 +21,21 @@
     "url": "https://github.com/fgfg163/react-debounce/issues"
   },
   "homepage": "https://github.com/fgfg163/react-debounce#readme",
+  "module": "es/index.js",
   "dependencies": {
-    "antd": "^2.12.7",
-    "react": "^15.6.1",
-    "react-dom": "^15.6.1",
-    "should-update": "^2.0.0"
+    "react": "^15.6.1"
   },
   "devDependencies": {
+    "antd": "^2.12.8",
     "babel-core": "^6.26.0",
     "babel-eslint": "^7.2.3",
-    "babel-loader": "^7.1.2",
     "babel-plugin-transform-runtime": "^6.23.0",
     "babel-preset-env": "^1.6.0",
     "babel-preset-react": "^6.24.1",
     "babel-preset-react-hmre": "^1.1.1",
     "babel-preset-stage-2": "^6.24.1",
     "babel-register": "^6.26.0",
-    "eslint": "^4.5.0",
-    "eslint-config-airbnb": "^15.1.0",
-    "eslint-loader": "^1.9.0",
-    "eslint-plugin-import": "^2.7.0",
-    "eslint-plugin-jsx-a11y": "^6.0.2",
-    "eslint-plugin-react": "^7.3.0",
-    "extract-text-webpack-plugin": "^3.0.0",
+    "babel-standalone": "^6.26.0",
     "gulp": "^3.9.1",
     "gulp-babel": "^7.0.0",
     "gulp-concat": "^2.6.1",
@@ -50,6 +43,10 @@
     "gulp-rename": "^1.2.2",
     "gulp-sourcemaps": "^2.6.1",
     "gulp-uglify": "^3.0.0",
-    "pump": "^1.0.2"
+    "html-pages": "^1.7.3",
+    "js-base64": "^2.1.9",
+    "prop-types": "^15.5.10",
+    "react-dom": "^15.6.1",
+    "should-update": "^2.0.0"
   }
 }

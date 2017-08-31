@@ -5,47 +5,27 @@ var babel = require('gulp-babel');
 var concat = require('gulp-concat');
 var sourcemaps = require('gulp-sourcemaps');
 var uglify = require('gulp-uglify');
-var pump = require('pump');
 var rename = require("gulp-rename");
-var gulpCopy = require('gulp-copy');
+var babelOption = require('./.babelrc');
+var commonjs = babelOption.commonjs;
+var nomodules = babelOption.nomodules;
 
 gulp.task('es', function () {
   return gulp.src('src/*')
-    .pipe(babel({
-      'presets': [
-        [
-          'env',
-          {
-            modules: false,
-            targets: {
-              browsers: [
-                '>= 5%',
-                'last 10 versions',
-                'not ie <= 8'
-              ]
-            }
-          }
-        ],
-        'stage-2',
-        'react'
-      ],
-      plugins: [
-        'transform-runtime'
-      ]
-    }))
+    .pipe(babel(nomodules))
     .pipe(gulp.dest('dist/es'));
 });
 
 gulp.task('lib', function () {
   return gulp.src('src/*')
-    .pipe(babel())
+    .pipe(babel(commonjs))
     .pipe(gulp.dest('dist/lib'));
 });
 
 gulp.task('package', function () {
   return gulp.src('src/*')
     .pipe(sourcemaps.init())
-    .pipe(babel())
+    .pipe(babel(commonjs))
     .pipe(concat('react-component-debounce.js'))
     .pipe(sourcemaps.write())
     .pipe(gulp.dest('dist/dist'));

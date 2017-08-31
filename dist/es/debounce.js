@@ -1,10 +1,4 @@
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-exports.default = function (func, ms) {
+export default function (func, ms) {
   var tid = void 0;
   return function () {
     for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
@@ -19,5 +13,3 @@ exports.default = function (func, ms) {
     }, ms);
   };
 };
-
-;

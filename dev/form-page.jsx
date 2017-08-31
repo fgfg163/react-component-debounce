@@ -8,7 +8,6 @@ import cityList from './city-list';
 const InputA = reactFormFieldDebounce(150)(Input);
 const FormItem = Form.Item;
 const RadioGroupA = reactFormFieldDebounce(250)(Radio.Group);
-const CheckboxGroupA = reactFormFieldDebounce(250)(Checkbox.Group);
 const CityCheckboxGroupA = reactFormFieldDebounce(250)(CityCheckboxGroup);
 
 
